@@ -851,12 +851,15 @@ void FireWeapon( gentity_t *ent ) {
 	switch( ent->s.weapon ) {
 	case WP_GAUNTLET:
 		Weapon_Gauntlet( ent );
+		knock = 50;
 		break;
 	case WP_LIGHTNING:
 		Weapon_LightningFire( ent );
+		knock = 100;
 		break;
 	case WP_SHOTGUN:
 		weapon_supershotgun_fire( ent );
+		knock = 300;
 		break;
 	case WP_MACHINEGUN:
 		if ( g_gametype.integer != GT_TEAM ) {
@@ -867,15 +870,19 @@ void FireWeapon( gentity_t *ent ) {
 		break;
 	case WP_GRENADE_LAUNCHER:
 		weapon_grenadelauncher_fire( ent );
+		knock = 250;
 		break;
 	case WP_ROCKET_LAUNCHER:
 		Weapon_RocketLauncher_Fire( ent );
+		knock = 500;
 		break;
 	case WP_PLASMAGUN:
 		Weapon_Plasmagun_Fire( ent );
+		knock = 150;
 		break;
 	case WP_RAILGUN:
 		weapon_railgun_fire( ent );
+		knock = 260;
 		break;
 	case WP_BFG:
 		BFG_Fire( ent );
