@@ -812,6 +812,9 @@ FireWeapon
 ===============
 */
 void FireWeapon( gentity_t *ent ) {
+	vec3_t kvel;
+	int knock;
+
 	if (ent->client->ps.powerups[PW_QUAD] ) {
 		s_quadFactor = g_quadfactor.value;
 	} else {
@@ -839,6 +842,9 @@ void FireWeapon( gentity_t *ent ) {
 	// set aiming directions
 	AngleVectors (ent->client->ps.viewangles, forward, right, up);
 
+	// Knockback
+	VectorNegate(forward, kvel);
+	knock = 200;
 	CalcMuzzlePointOrigin ( ent, ent->client->oldOrigin, forward, right, up, muzzle );
 
 	// fire the specific weapon
@@ -891,6 +897,18 @@ void FireWeapon( gentity_t *ent ) {
 	default:
 // FIXME		G_Error( "Bad ent->s.weapon" );
 		break;
+	}
+	VectorScale(kvel, knock, kvel);
+	VectorAdd(ent->client->ps.velocity, kvel, ent->client->ps.velocity);
+	// Magic from g_combat ~890
+	if (!ent->client->ps.pm_time)
+	{
+		int t;
+		t = knock*2;
+		if (t < 50) t = 50;
+		else if (t > 200) t = 200;
+		ent->client->ps.pm_time = t;
+		ent->client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
 	}
 }
 
