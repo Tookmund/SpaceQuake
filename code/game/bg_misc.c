@@ -267,6 +267,22 @@ gitem_t	bg_itemlist[] =
 /* sounds */ ""
 	},
 
+/*QUAKED weapon_sniper (.3 .3 1) (-16 -16 -16) (16 16 16) suspended
+*/
+        {
+                "weapon_sniper",
+                "sound/misc/w_pkup.wav",
+        { "models/g_campingrifle.md3",
+                NULL, NULL, NULL},
+/* icon */              "icons/iconw_rocket",
+/* pickup */    "Sniper",
+                20,
+                IT_WEAPON,
+                WP_SNIPER,
+/* precache */ "",
+/* sounds */ ""
+        },
+
 /*QUAKED weapon_lightning (.3 .3 1) (-16 -16 -16) (16 16 16) suspended
 */
 	{

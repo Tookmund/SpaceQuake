@@ -2824,6 +2824,9 @@ toolsclean2:
 distclean: clean toolsclean
 	@rm -rf $(BUILD_DIR)
 
+copymodels:
+	@cp -r ./models ./build/release-darwin-x86_64/baseq3/.
+
 installer: release
 ifdef MINGW
 	@$(MAKE) VERSION=$(VERSION) -C $(NSISDIR) V=$(V) \
@@ -2851,7 +2854,7 @@ ifneq ($(B),)
   -include $(OBJ_D_FILES) $(TOOLSOBJ_D_FILES)
 endif
 
-.PHONY: all clean clean2 clean-debug clean-release copyfiles \
+.PHONY: all clean clean2 clean-debug clean-release copyfiles copymodels \
 	debug default dist distclean installer makedirs \
 	release targets \
 	toolsclean toolsclean2 toolsclean-debug toolsclean-release \
