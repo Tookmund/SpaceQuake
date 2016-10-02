@@ -399,6 +399,22 @@ gitem_t	bg_itemlist[] =
 /* sounds */ ""
 	},
 
+/*QUAKED ammo_laser (.3 .3 1) (-16 -16 -16) (16 16 16) suspended
+*/
+	{
+		"ammo_laser",
+		"sound/misc/am_pkup.wav",
+		{ "models/g_laser.md3", 
+		0, 0, 0},
+/* icon */"	icons/icona_bfg",
+/* pickup */	"Flame Ammo",
+		50,
+		IT_AMMO,
+		WP_SNIPER,
+/* precache */ "",
+/* sounds */ ""
+	},
+
 /*QUAKED ammo_grenades (.3 .3 1) (-16 -16 -16) (16 16 16) suspended
 */
 	{
