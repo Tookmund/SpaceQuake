@@ -183,6 +183,9 @@ static void CG_Obituary( entityState_t *ent ) {
 		case MOD_BFG_SPLASH:
 			message = "should have used a smaller gun";
 			break;
+		case MOD_SNIPER:
+			message = "sniped by";
+			break;
 #ifdef MISSIONPACK
 		case MOD_PROXIMITY_MINE:
 			if( gender == GENDER_FEMALE ) {

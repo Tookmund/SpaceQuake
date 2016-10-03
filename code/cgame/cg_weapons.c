@@ -732,6 +732,13 @@ void CG_RegisterWeapon( int weaponNum ) {
 		weaponInfo->ejectBrassFunc = CG_ShotgunEjectBrass;
 		break;
 
+	case WP_SNIPER:
+		weaponInfo->flashSound[0] = trap_S_RegisterSound("sound/weapons/machinegun/machgf1b.wav", qfalse);
+		MAKERGB( weaponInfo->flashDlightColor, 0.6, 0.6, 1 );
+		weaponInfo->missileSound = trap_S_RegisterSound( "sound/weapons/plasma/lasfly.wav", qfalse );
+		cgs.media.lightningShader = trap_R_RegisterShader( "lightningBoltNew");
+		break;
+
 	case WP_ROCKET_LAUNCHER:
 		weaponInfo->missileModel = trap_R_RegisterModel( "models/ammo/rocket/rocket.md3" );
 		weaponInfo->missileSound = trap_S_RegisterSound( "sound/weapons/rocket/rockfly.wav", qfalse );
@@ -1862,6 +1869,12 @@ void CG_MissileHitWall( int weapon, int clientNum, vec3_t origin, vec3_t dir, im
 		mark = cgs.media.bulletMarkShader;
 		sfx = 0;
 		radius = 4;
+		break;
+	case WP_SNIPER:
+		mod = cgs.media.bulletFlashModel;
+		shader = cgs.media.railExplosionShader;
+		sfx = cgs.media.sfx_plasmaexp;
+		mark = cgs.media.burnMarkShader;
 		break;
 
 #ifdef MISSIONPACK

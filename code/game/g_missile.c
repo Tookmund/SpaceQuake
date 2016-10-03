@@ -554,6 +554,44 @@ gentity_t *fire_plasma (gentity_t *self, vec3_t start, vec3_t dir) {
 
 //=============================================================================
 
+/*
+=================
+fire_flame
+=================
+*/
+gentity_t *fire_laser (gentity_t *self, vec3_t start, vec3_t dir) {
+	gentity_t*bolt;
+
+	VectorNormalize (dir);
+
+	bolt = G_Spawn();
+	bolt->classname = "laser";
+	bolt->nextthink = level.time + 10000;
+	bolt->think = G_ExplodeMissile;
+	bolt->s.eType = ET_MISSILE;
+	bolt->r.svFlags = SVF_USE_CURRENT_ORIGIN;
+	bolt->s.weapon = WP_SNIPER;
+	bolt->r.ownerNum = self->s.number;
+	bolt->parent = self;
+	bolt->damage = 100;
+	bolt->splashDamage = 1;
+	bolt->splashRadius = 1;
+	bolt->methodOfDeath = MOD_SNIPER;
+	bolt->splashMethodOfDeath = MOD_PLASMA_SPLASH;
+	bolt->clipmask = MASK_SHOT;
+
+	bolt->s.pos.trType = TR_LINEAR;
+	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;// move a bit on the very first frame
+	VectorCopy( start, bolt->s.pos.trBase );
+	VectorScale( dir, 10000, bolt->s.pos.trDelta );
+	SnapVector( bolt->s.pos.trDelta );// save net bandwidth
+
+	VectorCopy (start, bolt->r.currentOrigin);
+
+	return bolt;
+}
+
+//=============================================================================
 
 /*
 =================

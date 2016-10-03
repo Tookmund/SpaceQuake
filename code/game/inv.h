@@ -37,8 +37,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define INVENTORY_NAILGUN			15
 #define INVENTORY_PROXLAUNCHER		16
 #define INVENTORY_CHAINGUN			17
-#define INVENTORY_SNIPER			35
-#define MODELINDEX_SNIPER			36
+#define INVENTORY_SNIPER			50
+#define MODELINDEX_SNIPER			51
 //ammo
 #define INVENTORY_SHELLS			18
 #define INVENTORY_BULLETS			19

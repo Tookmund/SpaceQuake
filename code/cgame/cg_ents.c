@@ -477,6 +477,14 @@ static void CG_Missile( centity_t *cent ) {
 		return;
 	}
 
+	if (cent->currentState.weapon == WP_SNIPER) {
+		ent.reType = RT_SPRITE;
+		ent.radius = 1;
+		ent.rotation = 0;
+		ent.customShader = cgs.media.plasmaBallShader;
+		trap_R_AddRefEntityToScene( &ent );
+	}
+
 	// flicker between two skins
 	ent.skinNum = cg.clientFrame & 1;
 	ent.hModel = weapon->missileModel;
