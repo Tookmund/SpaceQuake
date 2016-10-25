@@ -90,7 +90,8 @@ static const char *teamoverlay_names[] =
 };
 
 static void Preferences_SetMenuItems( void ) {
-	s_preferences.crosshair.curvalue		= (int)trap_Cvar_VariableValue( "cg_drawCrosshair" ) % NUM_CROSSHAIRS;
+	//s_preferences.crosshair.curvalue		= (int)trap_Cvar_VariableValue( "cg_drawCrosshair" ) % NUM_CROSSHAIRS;
+	s_preferences.crosshair.curvalue                = 9;
 	s_preferences.simpleitems.curvalue		= trap_Cvar_VariableValue( "cg_simpleItems" ) != 0;
 	s_preferences.brass.curvalue			= trap_Cvar_VariableValue( "cg_brassTime" ) != 0;
 	s_preferences.wallmarks.curvalue		= trap_Cvar_VariableValue( "cg_marks" ) != 0;
@@ -111,7 +112,8 @@ static void Preferences_Event( void* ptr, int notification ) {
 
 	switch( ((menucommon_s*)ptr)->id ) {
 	case ID_CROSSHAIR:
-		trap_Cvar_SetValue( "cg_drawCrosshair", s_preferences.crosshair.curvalue );
+		//trap_Cvar_SetValue( "cg_drawCrosshair", s_preferences.crosshair.curvalue );
+		trap_Cvar_SetValue( "cg_drawCrosshair", 9 );
 		break;
 
 	case ID_SIMPLEITEMS:
