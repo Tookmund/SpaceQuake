@@ -16,5 +16,8 @@ Snipers v Launchers
  - [ ] Model
  - [ ] Crosshair
  - [ ] Launcher
+ - [ ] Remove other weapons
+ - [ ] Create a large map
+ - [ ] Setup lives and round times and kills 
 
-NOTICE: Sniper uses lasers, not bullets. Testing nexuiz models. Not sure if they work yet ...
+Sniper works, figuring out where to call /cg_drawcrosshair "9"
