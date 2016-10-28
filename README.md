@@ -13,8 +13,8 @@ SPACE
 Snipers v Launchers
 ---------------------
  - [x] WP_SNIPER
- - [ ] Model
- - [ ] Crosshair
+ - [x] Model
+ - [x] Crosshair
  - [ ] Launcher
  - [ ] Remove other weapons
  - [ ] Create a large map
