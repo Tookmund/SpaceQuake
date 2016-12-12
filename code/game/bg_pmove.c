@@ -605,7 +605,10 @@ static void PM_AirMove( void ) {
 	float		wishspeed;
 	float		scale;
 	usercmd_t	cmd;
-
+	
+	// THERE IS NO AIR IN SPAAAAACE!!!
+	return;
+ 
 	PM_Friction();
 
 	fmove = pm->cmd.forwardmove;
@@ -700,9 +703,6 @@ static void PM_WalkMove( void ) {
 	float		vel;
 
 
-   // Disable walking for now
-   return;
-   
 	if ( pm->waterlevel > 2 && DotProduct( pml.forward, pml.groundTrace.plane.normal ) > 0 ) {
 		// begin swimming
 		PM_WaterMove();
