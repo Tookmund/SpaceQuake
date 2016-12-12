@@ -606,13 +606,11 @@ static void PM_AirMove( void ) {
 	float		scale;
 	usercmd_t	cmd;
 	
-	// THERE IS NO AIR IN SPAAAAACE!!!
-	return;
- 
 	PM_Friction();
 
-	fmove = pm->cmd.forwardmove;
-	smove = pm->cmd.rightmove;
+	// SPAAACE!!
+	fmove = 0; //pm->cmd.forwardmove;
+	smove = 0; //pm->cmd.rightmove;
 
 	cmd = pm->cmd;
 	scale = PM_CmdScale( &cmd );
