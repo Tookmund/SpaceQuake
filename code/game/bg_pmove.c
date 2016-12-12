@@ -699,6 +699,10 @@ static void PM_WalkMove( void ) {
 	float		accelerate;
 	float		vel;
 
+
+   // Disable walking for now
+   return;
+   
 	if ( pm->waterlevel > 2 && DotProduct( pml.forward, pml.groundTrace.plane.normal ) > 0 ) {
 		// begin swimming
 		PM_WaterMove();
