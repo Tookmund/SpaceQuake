@@ -8,4 +8,7 @@ Based on ioquake3
 SPACE
 -----
  - [x] Knockback
- - [ ] Zero Gravity
+ - [x] Zero Gravity
+ - [ ] Bounce Pads Crash
+ - [ ] Stick to Walls
+ - [ ] Stop Spawn Floating
