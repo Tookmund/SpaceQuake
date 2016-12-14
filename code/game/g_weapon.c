@@ -126,22 +126,6 @@ qboolean CheckGauntletAttack( gentity_t *ent ) {
 /*
 ======================================================================
 
-SNIPER
-
-======================================================================
-*/
-
-void Weapon_Sniper_Fire(gentity_t *ent) {
-	gentity_t *m;
-
-	m = fire_laser(ent, muzzle, forward);
-	m->damage *= s_quadFactor;
-	m->damage *= s_quadFactor;
-}
-
-/*
-======================================================================
-
 MACHINEGUN
 
 ======================================================================
@@ -905,9 +889,6 @@ void FireWeapon( gentity_t *ent ) {
 		break;
 	case WP_GRAPPLING_HOOK:
 		Weapon_GrapplingHook_Fire( ent );
-		break;
-	case WP_SNIPER:
-		Weapon_Sniper_Fire( ent );
 		break;
 #ifdef MISSIONPACK
 	case WP_NAILGUN:

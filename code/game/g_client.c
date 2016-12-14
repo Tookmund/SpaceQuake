@@ -1191,10 +1191,6 @@ void ClientSpawn(gentity_t *ent) {
 	client->ps.ammo[WP_GAUNTLET] = -1;
 	client->ps.ammo[WP_GRAPPLING_HOOK] = -1;
 
-	// spawn player with sniper
-	client->ps.stats[STAT_WEAPONS] |= ( 1 << WP_SNIPER );
-	client->ps.ammo[WP_SNIPER] = 999;
-
 	// health will count down towards max_health
 	ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + 25;
 
