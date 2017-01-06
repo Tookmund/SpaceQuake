@@ -842,11 +842,13 @@ void FireWeapon( gentity_t *ent ) {
 	// set aiming directions
 	AngleVectors (ent->client->ps.viewangles, forward, right, up);
 
+	CalcMuzzlePointOrigin ( ent, ent->client->oldOrigin, forward, right, up, muzzle );
+   
+   //* SPAAACE!!
 	// Knockback
 	VectorNegate(forward, kvel);
 	knock = 200;
-	CalcMuzzlePointOrigin ( ent, ent->client->oldOrigin, forward, right, up, muzzle );
-
+   //*/
 	// fire the specific weapon
 	switch( ent->s.weapon ) {
 	case WP_GAUNTLET:
@@ -905,8 +907,10 @@ void FireWeapon( gentity_t *ent ) {
 // FIXME		G_Error( "Bad ent->s.weapon" );
 		break;
 	}
+   //* SPAAACE!!
 	VectorScale(kvel, knock, kvel);
 	VectorAdd(ent->client->ps.velocity, kvel, ent->client->ps.velocity);
+
 	// Magic from g_combat ~890
 	if (!ent->client->ps.pm_time)
 	{
@@ -917,6 +921,7 @@ void FireWeapon( gentity_t *ent ) {
 		ent->client->ps.pm_time = t;
 		ent->client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
 	}
+   //*/
 }
 
 
