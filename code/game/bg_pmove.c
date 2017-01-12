@@ -503,6 +503,9 @@ static void PM_WaterMove( void ) {
 		wishvel[0] = 0;
 		wishvel[1] = 0;
 		wishvel[2] = -60;		// sink towards bottom
+		//* SPAAACE!
+		wishvel[2] = 0;
+		//*/
 	} else {
 		for (i=0 ; i<3 ; i++)
 			wishvel[i] = scale * pml.forward[i]*pm->cmd.forwardmove + scale * pml.right[i]*pm->cmd.rightmove;
