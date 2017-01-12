@@ -812,6 +812,10 @@ FireWeapon
 ===============
 */
 void FireWeapon( gentity_t *ent ) {
+	//* SPAAACE!
+	vect_3 kvel;
+	int knock;
+	//*/
 	if (ent->client->ps.powerups[PW_QUAD] ) {
 		s_quadFactor = g_quadfactor.value;
 	} else {
@@ -841,16 +845,24 @@ void FireWeapon( gentity_t *ent ) {
 
 	CalcMuzzlePointOrigin ( ent, ent->client->oldOrigin, forward, right, up, muzzle );
 
+	//* SPAAACE!
+	// Knockback
+	VectorNegate(forward,kvel);
+	knock = 200;
+	//*/
 	// fire the specific weapon
 	switch( ent->s.weapon ) {
 	case WP_GAUNTLET:
 		Weapon_Gauntlet( ent );
+		knock = 50;
 		break;
 	case WP_LIGHTNING:
 		Weapon_LightningFire( ent );
+		knock = 100;
 		break;
 	case WP_SHOTGUN:
 		weapon_supershotgun_fire( ent );
+		knock = 400;
 		break;
 	case WP_MACHINEGUN:
 		if ( g_gametype.integer != GT_TEAM ) {
@@ -861,18 +873,22 @@ void FireWeapon( gentity_t *ent ) {
 		break;
 	case WP_GRENADE_LAUNCHER:
 		weapon_grenadelauncher_fire( ent );
+		knock = 300;
 		break;
 	case WP_ROCKET_LAUNCHER:
 		Weapon_RocketLauncher_Fire( ent );
+		knock = 600;
 		break;
 	case WP_PLASMAGUN:
 		Weapon_Plasmagun_Fire( ent );
+		knock = 150;
 		break;
 	case WP_RAILGUN:
 		weapon_railgun_fire( ent );
 		break;
 	case WP_BFG:
 		BFG_Fire( ent );
+		knock = 600;
 		break;
 	case WP_GRAPPLING_HOOK:
 		Weapon_GrapplingHook_Fire( ent );
@@ -892,6 +908,22 @@ void FireWeapon( gentity_t *ent ) {
 // FIXME		G_Error( "Bad ent->s.weapon" );
 		break;
 	}
+	//* SPAAACE!
+	VectorScale(kvel,knock,kvel);
+	VectorAdd(ent->client->ps.velocity,kvel,ent->client->ps.velocity);
+
+	// Magic from g_combat ~890
+	if (!ent->client->ps.pm_time)
+	{
+		int t;
+		t = knock*2;
+		if (t < 50) t = 50;
+		else if (t > 200) t = 200;
+		ent->client->ps.pm_time = t;
+		ent->client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
+	}
+
+	//*/
 }
 
 
