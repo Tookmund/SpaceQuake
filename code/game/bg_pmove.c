@@ -611,8 +611,8 @@ static void PM_AirMove( void ) {
 
 	PM_Friction();
 
-	// fmove = pm->cmd.forwardmove;
-	// smove = pm->cmd.rightmove;
+	fmove = pm->cmd.forwardmove;
+	smove = pm->cmd.rightmove;
 	//* SPAAACE!
 	fmove = 0;
 	smove = 0;
