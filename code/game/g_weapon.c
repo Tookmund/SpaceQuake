@@ -813,7 +813,7 @@ FireWeapon
 */
 void FireWeapon( gentity_t *ent ) {
 	//* SPAAACE!
-	vect_3 kvel;
+	vec3_t kvel;
 	int knock;
 	//*/
 	if (ent->client->ps.powerups[PW_QUAD] ) {
