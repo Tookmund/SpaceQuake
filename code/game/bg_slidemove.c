@@ -161,6 +161,11 @@ qboolean	PM_SlideMove( qboolean gravity ) {
 			// slide along the plane
 			PM_ClipVelocity (endVelocity, planes[i], endClipVelocity, OVERCLIP );
 
+         //* SPAAACE!
+         // Change Floor
+         // This will definitely break
+         pml->groundPlane = qtrue;
+         //*/
 			// see if there is a second plane that the new move enters
 			for ( j = 0 ; j < numplanes ; j++ ) {
 				if ( j == i ) {
