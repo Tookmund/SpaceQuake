@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Quake III Arena source code; if not, write to the Free Software
+along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
@@ -78,9 +78,7 @@ TELEPORTERS
 
 void TeleportPlayer( gentity_t *player, vec3_t origin, vec3_t angles ) {
 	gentity_t	*tent;
-	qboolean noAngles;
 
-	noAngles = (angles[0] > 999999.0);
 	// use temp events at source and destination to prevent the effect
 	// from getting dropped by a second player event
 	if ( player->client->sess.sessionTeam != TEAM_SPECTATOR ) {
@@ -96,17 +94,19 @@ void TeleportPlayer( gentity_t *player, vec3_t origin, vec3_t angles ) {
 
 	VectorCopy ( origin, player->client->ps.origin );
 	player->client->ps.origin[2] += 1;
-	if (!noAngles) {
+
 	// spit the player out
 	AngleVectors( angles, player->client->ps.velocity, NULL, NULL );
 	VectorScale( player->client->ps.velocity, 400, player->client->ps.velocity );
 	player->client->ps.pm_time = 160;		// hold time
 	player->client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
-	// set angles
-	SetClientViewAngle(player, angles);
-	}
+
 	// toggle the teleport bit so the client knows to not lerp
 	player->client->ps.eFlags ^= EF_TELEPORT_BIT;
+
+	// set angles
+	SetClientViewAngle( player, angles );
+
 	// kill anything at the destination
 	if ( player->client->sess.sessionTeam != TEAM_SPECTATOR ) {
 		G_KillBox (player);
@@ -120,6 +120,46 @@ void TeleportPlayer( gentity_t *player, vec3_t origin, vec3_t angles ) {
 
 	if ( player->client->sess.sessionTeam != TEAM_SPECTATOR ) {
 		trap_LinkEntity (player);
+	}
+}
+
+/******** Sandro Launchpad/Teleport stuff - teleport an entity that's not a player (for teleporting missiles mostly) 3/6/08 ***/
+void TeleportEntity( gentity_t *ent, vec3_t origin, vec3_t angles, qboolean effect, qboolean spit, qboolean telefrag ) {
+	vec_t		speed;
+	gentity_t	*tent;
+
+	// check to see if an effect is called for
+	if ( effect ) {
+		tent = G_TempEntity( ent->r.currentOrigin, EV_PLAYER_TELEPORT_OUT );
+		tent->s.clientNum = ent->s.number;
+
+		tent = G_TempEntity( origin, EV_PLAYER_TELEPORT_IN );
+		tent->s.clientNum = ent->s.number;
+	}
+
+	VectorCopy( origin, ent->s.origin );
+	VectorCopy( origin, ent->r.currentOrigin );
+	VectorCopy( origin, ent->s.pos.trBase );
+
+	// spit the entity out
+	if ( spit ) {
+		AngleVectors( angles, ent->s.pos.trDelta, NULL, NULL );
+		VectorScale( ent->s.pos.trDelta, 400, ent->s.pos.trDelta );
+		AngleVectors( angles, ent->s.apos.trBase, NULL, NULL );
+		AngleVectors( angles, ent->r.currentAngles, NULL, NULL );
+	} else {
+		speed = VectorLength( ent->s.pos.trDelta );
+		AngleVectors( angles, ent->s.pos.trDelta, NULL, NULL );
+		VectorScale( ent->s.pos.trDelta, speed, ent->s.pos.trDelta );
+		AngleVectors( angles, ent->r.currentAngles, NULL, NULL );
+	}
+
+	SnapVector( ent->s.pos.trDelta );
+	ent->s.pos.trTime = level.time;
+
+	// telefrag stuff
+	if ( telefrag ) {
+		G_KillBox (ent);
 	}
 }
 

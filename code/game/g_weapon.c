@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Quake III Arena source code; if not, write to the Free Software
+along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
@@ -47,7 +47,38 @@ void G_BounceProjectile( vec3_t start, vec3_t impact, vec3_t dir, vec3_t endout 
 	VectorNormalize(newv);
 	VectorMA(impact, 8192, newv, endout);
 }
+//***************************************11/15/07**********************************
+/****************************WALLWALKING JG**********************************/
+//TEST LATER-JG//MIGHT CAUSE FLASH!
+/*
+===============
+Inv_CalcMuzzlePoint
 
+set muzzle location relative to pivoting eye
+===============
+*/
+void Inv_CalcMuzzlePoint(gentity_t *ent, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint)
+{
+	gclient_t *cl = ent->client;
+	int i;
+	vec3_t Gravity;
+
+	if (!cl)
+	{
+		CalcMuzzlePoint(ent, forward, right, up, muzzlePoint);
+		return;
+	}
+
+	Inv_GetVectorFromStat(cl->ps.stats[STAT_GRAVITY], Gravity);
+
+	VectorCopy(ent->s.pos.trBase, muzzlePoint);
+	for (i = 0; i < 3; ++i)
+		muzzlePoint[i] -= ent->client->ps.viewheight * Gravity[i];
+	VectorMA(muzzlePoint, 8, forward, muzzlePoint);
+	// snap to integer coordinates for more efficient network bandwidth usage
+	SnapVector(muzzlePoint);
+}
+/****************************END WALLWALKING JG**********************************/
 
 /*
 ======================================================================
@@ -61,15 +92,113 @@ void Weapon_Gauntlet( gentity_t *ent ) {
 
 }
 
+/****************************WALLWALKING JG**********************************/
+//TEST LATER-JG //MIGHT CAUSE FLASH!!!
 /*
 ===============
 CheckGauntletAttack
 ===============
 */
-qboolean CheckGauntletAttack( gentity_t *ent ) {
+qboolean CheckGauntletAttack( gentity_t *ent ) 
+{
 	trace_t		tr;
+	vec3_t		end, mins, maxs, Matrix[3];
+	//gentity_t	*tent;
+	gentity_t	*traceEnt;
+	int			damage;
+	int AttackDist = 28 + 6;
+	gclient_t	*cl = ent->client;
+	int Race = -1, Current;
+	vec4_t Quat;
+
+	// set aiming directions
+	if (cl)
+	{
+		//if (!cl->TrackGauntletHit)
+		//	return qfalse;
+
+		/*if (!Inv_IsFiring(cl->ps.weaponstate))
+		{
+			cl->TrackGauntletHit = qfalse;
+			return qfalse;
+		}
+
+		if (cl->sess.sessionTeam == level.AlienTeam)
+			Race = cl->ps.persistant[PERS_CLASS] & e_Class_AlienRaceMask;
+
+		if (Race == e_Selection_Xenomorph)
+			AttackDist = 40 + 6;*/
+
+		// set aiming directions
+
+		Current = (cl->ps.stats[STAT_SPEC1] << 16) + (cl->ps.stats[STAT_SPEC2] & 65535);
+
+		if (Current)
+		{
+			AngleVectors(cl->ps.viewangles, Matrix[0], Matrix[1], Matrix[2]);
+
+			Inv_GetQuatFromStat(Current, Quat, NULL);
+			Inv_QuatMultiply(Quat, Matrix);
+
+			VectorCopy(Matrix[0], forward);
+			VectorCopy(Matrix[1], right);
+			VectorCopy(Matrix[2], up);
+		}
+		else
+			AngleVectors(cl->ps.viewangles, forward, right, up);
+	}
+	else
+		AngleVectors(cl->ps.viewangles, forward, right, up);
+
+	Inv_CalcMuzzlePoint(ent, forward, right, up, muzzle);
+	VectorMA(muzzle, AttackDist, forward, end);
+
+	VectorSet(mins, -5, -5, -5);
+	VectorSet(maxs, 5, 5, 5);
+
+	trap_Trace (&tr, muzzle, NULL, NULL, end, ent->s.number, MASK_SHOT);
+	if ( tr.surfaceFlags & SURF_NOIMPACT ) {
+		return qfalse;
+	}
+
+	traceEnt = &g_entities[ tr.entityNum ];
+
+	// send blood impact
+	//if ( traceEnt->takedamage && traceEnt->client ) {
+	//	tent = G_TempEntity( tr.endpos, EV_MISSILE_HIT );
+	//	tent->s.otherEntityNum = traceEnt->s.number;
+	//	tent->s.eventParm = DirToByte( tr.plane.normal );
+	//	tent->s.weapon = ent->s.weapon;
+	//}
+
+	if ( !traceEnt->takedamage) {
+		return qfalse;
+	}
+
+	if (ent->client->ps.powerups[PW_QUAD] ) {
+		//G_AddEvent( ent, EV_POWERUP_QUAD, 0 );
+		s_quadFactor = g_quadfactor.value;
+	} else {
+		s_quadFactor = 1;
+	}
+#ifdef MISSIONPACK
+	if( ent->client->persistantPowerup && ent->client->persistantPowerup->item && ent->client->persistantPowerup->item->giTag == PW_DOUBLER ) {
+		s_quadFactor *= 2;
+	}
+#endif
+
+	//damage = 50 * s_quadFactor;
+	damage = 50 * s_quadFactor;
+	G_Damage( traceEnt, ent, ent, forward, tr.endpos,
+		damage, 0, MOD_GAUNTLET );
+
+	return qtrue;
+}
+/************************************************************************/
+//Original Code Below
+	/*trace_t		tr;
 	vec3_t		end;
-	gentity_t	*tent;
+	//	gentity_t	*tent;
 	gentity_t	*traceEnt;
 	int			damage;
 
@@ -85,26 +214,22 @@ qboolean CheckGauntletAttack( gentity_t *ent ) {
 		return qfalse;
 	}
 
-	if ( ent->client->noclip ) {
-		return qfalse;
-	}
-
 	traceEnt = &g_entities[ tr.entityNum ];
 
 	// send blood impact
-	if ( traceEnt->takedamage && traceEnt->client ) {
-		tent = G_TempEntity( tr.endpos, EV_MISSILE_HIT );
-		tent->s.otherEntityNum = traceEnt->s.number;
-		tent->s.eventParm = DirToByte( tr.plane.normal );
-		tent->s.weapon = ent->s.weapon;
-	}
+	//if ( traceEnt->takedamage && traceEnt->client ) {
+	//	tent = G_TempEntity( tr.endpos, EV_MISSILE_HIT );
+	//	tent->s.otherEntityNum = traceEnt->s.number;
+	//	tent->s.eventParm = DirToByte( tr.plane.normal );
+	//	tent->s.weapon = ent->s.weapon;
+	//}
 
 	if ( !traceEnt->takedamage) {
 		return qfalse;
 	}
 
 	if (ent->client->ps.powerups[PW_QUAD] ) {
-		G_AddEvent( ent, EV_POWERUP_QUAD, 0 );
+		//G_AddEvent( ent, EV_POWERUP_QUAD, 0 );
 		s_quadFactor = g_quadfactor.value;
 	} else {
 		s_quadFactor = 1;
@@ -115,12 +240,14 @@ qboolean CheckGauntletAttack( gentity_t *ent ) {
 	}
 #endif
 
+	//damage = 50 * s_quadFactor;
 	damage = 50 * s_quadFactor;
 	G_Damage( traceEnt, ent, ent, forward, tr.endpos,
 		damage, 0, MOD_GAUNTLET );
 
-	return qtrue;
-}
+	return qtrue;*/
+/***********************************************************************/
+/****************************END WALLWALKING JG**********************************/
 
 
 /*
@@ -146,22 +273,21 @@ void SnapVectorTowards( vec3_t v, vec3_t to ) {
 
 	for ( i = 0 ; i < 3 ; i++ ) {
 		if ( to[i] <= v[i] ) {
-			v[i] = floor(v[i]);
+			v[i] = (int)v[i];
 		} else {
-			v[i] = ceil(v[i]);
+			v[i] = (int)v[i] + 1;
 		}
 	}
 }
 
 #ifdef MISSIONPACK
 #define CHAINGUN_SPREAD		600
-#define CHAINGUN_DAMAGE		7
 #endif
 #define MACHINEGUN_SPREAD	200
 #define	MACHINEGUN_DAMAGE	7
 #define	MACHINEGUN_TEAM_DAMAGE	5		// wimpier MG in teamplay
 
-void Bullet_Fire (gentity_t *ent, float spread, int damage, int mod ) {
+void Bullet_Fire (gentity_t *ent, float spread, int damage ) {
 	trace_t		tr;
 	vec3_t		end;
 #ifdef MISSIONPACK
@@ -226,7 +352,7 @@ void Bullet_Fire (gentity_t *ent, float spread, int damage, int mod ) {
 			else {
 #endif
 				G_Damage( traceEnt, ent, ent, forward, tr.endpos,
-					damage, 0, mod);
+					damage, 0, MOD_MACHINEGUN);
 #ifdef MISSIONPACK
 			}
 #endif
@@ -329,6 +455,7 @@ void ShotgunPattern( vec3_t origin, vec3_t origin2, int seed, gentity_t *ent ) {
 	float		r, u;
 	vec3_t		end;
 	vec3_t		forward, right, up;
+	int			oldScore;
 	qboolean	hitClient = qfalse;
 
 	// derive the right and up vectors from the forward vector, because
@@ -336,6 +463,8 @@ void ShotgunPattern( vec3_t origin, vec3_t origin2, int seed, gentity_t *ent ) {
 	VectorNormalize2( origin2, forward );
 	PerpendicularVector( right, forward );
 	CrossProduct( forward, right, up );
+
+	oldScore = ent->client->ps.persistant[PERS_SCORE];
 
 	// generate the "random" spread pattern
 	for ( i = 0 ; i < DEFAULT_SHOTGUN_COUNT ; i++ ) {
@@ -796,14 +925,37 @@ CalcMuzzlePointOrigin
 set muzzle location relative to pivoting eye
 ===============
 */
+/**************************************************************************************************************/
 void CalcMuzzlePointOrigin ( gentity_t *ent, vec3_t origin, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint ) {
-	VectorCopy( ent->s.pos.trBase, muzzlePoint );
+
+	int Current;
+	vec3_t Quat, Matrix[3];
+	gclient_t	*cl = ent->client;
+
+	Current = (cl->ps.stats[STAT_SPEC1] << 16) + (cl->ps.stats[STAT_SPEC2] & 65535);
+
+		if (Current)
+		{
+			AngleVectors(cl->ps.viewangles, Matrix[0], Matrix[1], Matrix[2]);
+
+			Inv_GetQuatFromStat(Current, Quat, NULL);
+			Inv_QuatMultiply(Quat, Matrix);
+
+			VectorCopy(Matrix[0], forward);
+			VectorCopy(Matrix[1], right);
+			VectorCopy(Matrix[2], up);
+		}
+		else
+			AngleVectors(cl->ps.viewangles, forward, right, up);
+
+	Inv_CalcMuzzlePoint(ent, forward, right, up, muzzle);
+	/*VectorCopy( ent->s.pos.trBase, muzzlePoint );
 	muzzlePoint[2] += ent->client->ps.viewheight;
 	VectorMA( muzzlePoint, 14, forward, muzzlePoint );
 	// snap to integer coordinates for more efficient network bandwidth usage
-	SnapVector( muzzlePoint );
+	SnapVector( muzzlePoint );*/
 }
-
+/**************************************************************************************************************/
 
 
 /*
@@ -854,9 +1006,9 @@ void FireWeapon( gentity_t *ent ) {
 		break;
 	case WP_MACHINEGUN:
 		if ( g_gametype.integer != GT_TEAM ) {
-			Bullet_Fire( ent, MACHINEGUN_SPREAD, MACHINEGUN_DAMAGE, MOD_MACHINEGUN );
+			Bullet_Fire( ent, MACHINEGUN_SPREAD, MACHINEGUN_DAMAGE );
 		} else {
-			Bullet_Fire( ent, MACHINEGUN_SPREAD, MACHINEGUN_TEAM_DAMAGE, MOD_MACHINEGUN );
+			Bullet_Fire( ent, MACHINEGUN_SPREAD, MACHINEGUN_TEAM_DAMAGE );
 		}
 		break;
 	case WP_GRENADE_LAUNCHER:
@@ -885,7 +1037,7 @@ void FireWeapon( gentity_t *ent ) {
 		weapon_proxlauncher_fire( ent );
 		break;
 	case WP_CHAINGUN:
-		Bullet_Fire( ent, CHAINGUN_SPREAD, CHAINGUN_DAMAGE, MOD_CHAINGUN );
+		Bullet_Fire( ent, CHAINGUN_SPREAD, MACHINEGUN_DAMAGE );
 		break;
 #endif
 	default:

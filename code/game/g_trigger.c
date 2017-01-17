@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Quake III Arena source code; if not, write to the Free Software
+along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
@@ -131,6 +131,46 @@ void SP_trigger_always (gentity_t *ent) {
 	ent->think = trigger_always_think;
 }
 
+//Sandro Launchpad/Teleport Stuff ************** 3/7/08
+/*
+========================
+G_TouchJumpPad
+========================
+*/
+void G_TouchJumpPad( gentity_t *ent, gentity_t *jumppad ) {
+	vec3_t	angles;
+	float p;
+	int effectNum;
+
+	// if we didn't hit this same jumppad the previous frame
+	// then don't play the event sound again if we are in a fat trigger
+	if ( ent->jumppad_ent != ent->s.number ) {
+
+		vectoangles( jumppad->s.origin2, angles);
+		p = fabs( AngleNormalize180( angles[PITCH] ) );
+		if( p < 45 ) {
+			effectNum = 0;
+		} else {
+			effectNum = 1;
+		}
+
+		G_AddEvent( ent, EV_JUMP_PAD_ENTITY, 0 );
+	}
+	// remember hitting this jumppad this frame
+	ent->jumppad_ent = jumppad->s.number;
+	ent->jumppad_frame = level.framenum;
+
+	// give the entity the velocity from the jumppad
+	if ( ent->s.pos.trType == TR_STATIONARY ) {
+		ent->s.pos.trType = TR_GRAVITY;
+	}
+
+	VectorCopy( jumppad->s.origin2, ent->s.pos.trDelta );
+	VectorCopy( ent->r.currentOrigin, ent->s.pos.trBase );
+	ent->s.pos.trTime = level.time;
+}
+
+
 
 /*
 ==============================================================================
@@ -142,11 +182,18 @@ trigger_push
 
 void trigger_push_touch (gentity_t *self, gentity_t *other, trace_t *trace ) {
 
+	/*
 	if ( !other->client ) {
 		return;
 	}
+	*/
 
-	BG_TouchJumpPad( &other->client->ps, &self->s );
+	//Sandro Launchpad/Teleport Stuff - different rules for clients - they can predict 3/7/08 ***********
+	if ( other->client ) {
+		BG_TouchJumpPad( &other->client->ps, &self->s );
+	} else if ( other->physicsObject ) {
+		G_TouchJumpPad( other, self );
+	}
 }
 
 
@@ -271,14 +318,19 @@ trigger_teleport
 void trigger_teleporter_touch (gentity_t *self, gentity_t *other, trace_t *trace ) {
 	gentity_t	*dest;
 
-	if ( !other->client ) {
+//Sandro Launchpad/Teleport Stuff - a missile can go through ********* 3/7/08
+	if ( !other->client && other->s.eType != ET_MISSILE) {
 		return;
 	}
-	if ( other->client->ps.pm_type == PM_DEAD ) {
+
+//Sandro Launchpad/Teleport Stuff - other->client check - it can be NULL at this point ******* 3/7/08
+	if ( other->client && other->client->ps.pm_type == PM_DEAD ) {
 		return;
 	}
-	// Spectators only?
-	if ( ( self->spawnflags & 1 ) && 
+	
+// Spectators only?
+//Sandro Launchpad/Teleport stuff - otherr->client check - it can be NULL at this point ****** 3/7/08
+	if ( ( self->spawnflags & 1 ) && other->client && 
 		other->client->sess.sessionTeam != TEAM_SPECTATOR ) {
 		return;
 	}
@@ -290,7 +342,17 @@ void trigger_teleporter_touch (gentity_t *self, gentity_t *other, trace_t *trace
 		return;
 	}
 
-	TeleportPlayer( other, dest->s.origin, dest->s.angles );
+	//Sandro - if there's an associated client, it's a player 3/7/08
+	if ( other->client ) 
+	{
+		TeleportPlayer( other, dest->s.origin, dest->s.angles);
+	//Sandro - if not, it can only be a missile with a trajectory 3/7/08
+	} 
+	else 
+		if ( other->s.eType == ET_MISSILE ) 
+		{
+			TeleportEntity( other, dest->s.origin, dest->s.angles, qfalse, qfalse, qfalse );
+		}
 }
 
 
@@ -390,13 +452,14 @@ void SP_trigger_hurt( gentity_t *self ) {
 		self->damage = 5;
 	}
 
-	self->use = hurt_use;
+	self->r.contents = CONTENTS_TRIGGER;
+
+	if ( self->spawnflags & 2 ) {
+		self->use = hurt_use;
+	}
 
 	// link in to the world if starting active
-	if ( self->spawnflags & 1 ) {
-		trap_UnlinkEntity (self);
-	}
-	else {
+	if ( ! (self->spawnflags & 1) ) {
 		trap_LinkEntity (self);
 	}
 }

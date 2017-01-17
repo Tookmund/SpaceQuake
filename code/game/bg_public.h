@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Quake III Arena source code; if not, write to the Free Software
+along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // because games can change separately from the main system version, we need a
 // second version that must match between game and cgame
 
-#define	GAME_VERSION		BASEGAME "-1"
+#define	GAME_VERSION		"baseq3-1"
 
 #define	DEFAULT_GRAVITY		800
 #define	GIB_HEALTH			-40
@@ -142,6 +142,10 @@ typedef enum {
 // pmove->pm_flags
 #define	PMF_DUCKED			1
 #define	PMF_JUMP_HELD		2
+/*****************************/
+//Time while wallwalking(Flag)-JG 1/23/08
+#define	PMF_TIME_WALLWALK	4
+/*****************************/
 #define	PMF_BACKWARDS_JUMP	8		// go into backwards land
 #define	PMF_BACKWARDS_RUN	16		// coast down to backwards run
 #define	PMF_TIME_LAND		32		// pm_time is time before rejump
@@ -153,8 +157,12 @@ typedef enum {
 #define PMF_FOLLOW			4096	// spectate following another player
 #define PMF_SCOREBOARD		8192	// spectate as a scoreboard
 #define PMF_INVULEXPAND		16384	// invulnerability sphere set to full size
+/**********************************************************************************************/
+#define PMF_RESET_GRAV		32768
 
-#define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
+//Added Wall-Walking to Definition 1/23/08
+#define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK|PMF_TIME_WALLWALK)
+/**********************************************************************************************/
 
 #define	MAXTOUCH	32
 typedef struct {
@@ -210,7 +218,14 @@ typedef enum {
 	STAT_ARMOR,				
 	STAT_DEAD_YAW,					// look this direction when dead (FIXME: get rid of?)
 	STAT_CLIENTS_READY,				// bit mask of clients wishing to exit the intermission (FIXME: configstring?)
-	STAT_MAX_HEALTH					// health / armor limit, changable by handicap
+	STAT_MAX_HEALTH,					// health / armor limit, changable by handicap
+	/***********************************************************************************************/
+//Have usage with gravity and rotation when doing wallwalking.
+	STAT_GRAVITY,					//Too: Gravity vection; hi-char = x; low-char = y;
+	STAT_SPEC1,						//Too: used for WallWalk (current Quaternion for Rotation)
+	STAT_SPEC2,
+	STAT_DYNYAW					//Too: automatic Rotation (still for Wallwalk)
+/***********************************************************************************************/
 } statIndex_t;
 
 
@@ -330,7 +345,7 @@ typedef enum {
 #define PLAYEREVENT_HOLYSHIT			0x0004
 
 // entityState_t->event values
-// entity events are for effects that take place relative
+// entity events are for effects that take place reletive
 // to an existing entities origin.  Very network efficient.
 
 // two bits at the top of the entityState->event field
@@ -447,9 +462,13 @@ typedef enum {
 	EV_TAUNT_FOLLOWME,
 	EV_TAUNT_GETFLAG,
 	EV_TAUNT_GUARDBASE,
-	EV_TAUNT_PATROL
+	EV_TAUNT_PATROL,
 
-} entity_event_t;
+//Sandro Launchpad/Teleport Stuff 3/7/8 **************8
+	EV_JUMP_PAD_ENTITY,
+
+}
+ entity_event_t;
 
 
 typedef enum {
@@ -735,4 +754,17 @@ qboolean	BG_PlayerTouchesItem( playerState_t *ps, entityState_t *item, int atTim
 #define KAMI_SHOCKWAVE_MAXRADIUS		1320
 #define KAMI_BOOMSPHERE_MAXRADIUS		720
 #define KAMI_SHOCKWAVE2_MAXRADIUS		704
+
+/****************************WALLWALKING JG**********************************/
+/************************************************************/
+//Define Wallwalk crap 1/23/08-JG
+void Inv_GetVectorFromStat(int Stat, vec3_t vec);
+void Inv_QuatMultiply(vec4_t Quat, vec3_t InMatrix[3]);
+void Inv_GetQuatFromStat(int Stat, vec4_t Quat, vec4_t QuatInt);
+void Inv_QuatToMatrix(vec4_t Quat, vec3_t Matrix[3]);
+
+qboolean Inv_ApplyGravityRotation(float Time, vec4_t Final);
+extern vec3_t Gravity;
+/************************************************************/
+/****************************END WALLWALKING JG**********************************/
 

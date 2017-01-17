@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Quake III Arena source code; if not, write to the Free Software
+along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
@@ -127,6 +127,15 @@ void P_WorldEffects( gentity_t *ent ) {
 				ent->damage += 2;
 				if (ent->damage > 15)
 					ent->damage = 15;
+
+				// play a gurp sound instead of a normal pain sound
+				if (ent->health <= ent->damage) {
+					G_Sound(ent, CHAN_VOICE, G_SoundIndex("*drown.wav"));
+				} else if (rand()&1) {
+					G_Sound(ent, CHAN_VOICE, G_SoundIndex("sound/player/gurp1.wav"));
+				} else {
+					G_Sound(ent, CHAN_VOICE, G_SoundIndex("sound/player/gurp2.wav"));
+				}
 
 				// don't play a normal pain sound
 				ent->pain_debounce_time = level.time + 200;
@@ -460,7 +469,7 @@ void ClientTimerActions( gentity_t *ent, int msec ) {
 	if( bg_itemlist[client->ps.stats[STAT_PERSISTANT_POWERUP]].giTag == PW_AMMOREGEN ) {
 		int w, max, inc, t, i;
     int weapList[]={WP_MACHINEGUN,WP_SHOTGUN,WP_GRENADE_LAUNCHER,WP_ROCKET_LAUNCHER,WP_LIGHTNING,WP_RAILGUN,WP_PLASMAGUN,WP_BFG,WP_NAILGUN,WP_PROX_LAUNCHER,WP_CHAINGUN};
-    int weapCount = ARRAY_LEN( weapList );
+    int weapCount = sizeof(weapList) / sizeof(int);
 		//
     for (i = 0; i < weapCount; i++) {
 		  w = weapList[i];
@@ -530,6 +539,7 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 	int		event;
 	gclient_t *client;
 	int		damage;
+	vec3_t	dir;
 	vec3_t	origin, angles;
 //	qboolean	fired;
 	gitem_t *item;
@@ -557,8 +567,10 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 			} else {
 				damage = 5;
 			}
+			VectorSet (dir, 0, 0, 1);
 			ent->pain_debounce_time = level.time + 200;	// no normal pain sound
-			G_Damage (ent, NULL, NULL, NULL, NULL, damage, 0, MOD_FALLING);
+/**************************** Sandro *********** Commented out fall damage ********* 3/14/08 *******/
+		//G_Damage (ent, NULL, NULL, NULL, NULL, damage, 0, MOD_FALLING);
 			break;
 
 		case EV_FIRE_WEAPON:
@@ -614,7 +626,7 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 				}
 			}
 #endif
-			SelectSpawnPoint( ent->client->ps.origin, origin, angles, qfalse );
+			SelectSpawnPoint( ent->client->ps.origin, origin, angles );
 			TeleportPlayer( ent, origin, angles );
 			break;
 
@@ -829,7 +841,10 @@ void ClientThink_real( gentity_t *ent ) {
 	client->ps.gravity = g_gravity.value;
 
 	// set speed
-	client->ps.speed = g_speed.value;
+	/*************************************************/
+	//Lower Speed so I don't go blind while testing-JG 2/29/08
+	client->ps.speed = g_speed.value;//g_speed.value;
+	/*************************************************/
 
 #ifdef MISSIONPACK
 	if( bg_itemlist[client->ps.stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {
@@ -990,13 +1005,13 @@ void ClientThink_real( gentity_t *ent ) {
 			// forcerespawn is to prevent users from waiting out powerups
 			if ( g_forcerespawn.integer > 0 && 
 				( level.time - client->respawnTime ) > g_forcerespawn.integer * 1000 ) {
-				ClientRespawn( ent );
+				respawn( ent );
 				return;
 			}
 		
 			// pressing attack or use is the normal respawn method
 			if ( ucmd->buttons & ( BUTTON_ATTACK | BUTTON_USE_HOLDABLE ) ) {
-				ClientRespawn( ent );
+				respawn( ent );
 			}
 		}
 		return;
@@ -1037,6 +1052,217 @@ void G_RunClient( gentity_t *ent ) {
 	ClientThink_real( ent );
 }
 
+//Sandro Launchpad/Teleport Proxy Stuff ***************** 3/7/08
+/*
+================
+G_ProxyTouch
+================
+*/
+void G_ProxyTouch( gentity_t *ent ) {
+	int			i, num;
+	int			touch[MAX_GENTITIES];
+	trace_t		trace;
+	vec3_t		mins, maxs;
+	static vec3_t	range = { 40, 40, 52 };
+	gentity_t	*hit;
+	int			passent = ent->s.number, cont, sample1, sample2, waterlevel, watertype;
+	gentity_t	*player = &g_entities[ent->s.otherEntityNum];
+	vec3_t		point;
+
+	VectorSubtract( ent->r.currentOrigin, range, mins );
+	VectorAdd( ent->r.currentOrigin, range, maxs );
+
+	num = trap_EntitiesInBox( mins, maxs, touch, MAX_GENTITIES );
+
+	// can't use ent->absmin, because that has a one unit pad
+	VectorAdd( ent->r.currentOrigin, ent->r.mins, mins );
+	VectorAdd( ent->r.currentOrigin, ent->r.maxs, maxs );
+
+	for ( i=0 ; i<num ; i++ ) {
+		hit = &g_entities[touch[i]];
+
+		if ( !hit->touch ) {
+			continue;
+		}
+
+		if ( !( hit->r.contents & CONTENTS_TRIGGER ) ) {
+			continue;
+		}
+
+		// ignore most entities
+		if ( hit->touch != trigger_teleporter_touch &&
+			hit->touch != hurt_touch &&
+			hit->touch != trigger_push_touch ) {
+			continue;
+		}
+
+		if ( !trap_EntityContact( mins, maxs, hit ) ) {
+			continue;
+		}
+
+		memset( &trace, 0, sizeof(trace) );
+		hit->touch (hit, ent, &trace);
+	}
+
+	// reset the jumppad stuff if we didn't touch one on this frame
+	if ( ent->jumppad_frame != level.framenum ) {
+		ent->jumppad_frame = 0;
+		ent->jumppad_ent = 0;
+	}
+
+	// figure out the proxy's water level
+	if ( player ) {
+		// get waterlevel and type
+		waterlevel = 0;
+		watertype = 0;
+
+		point[0] = ent->r.currentOrigin[0];
+		point[1] = ent->r.currentOrigin[1];
+		point[2] = ent->r.currentOrigin[2] + MINS_Z + 1;
+		cont = trap_PointContents( point, passent );
+
+		if ( cont & MASK_WATER ) {
+			sample2 = DEFAULT_VIEWHEIGHT - MINS_Z;
+			sample1 = sample2 / 2;
+
+			watertype = cont;
+			waterlevel = 1;
+			point[2] = ent->r.currentOrigin[2] + MINS_Z + sample1;
+			cont = trap_PointContents (point, passent );
+			if ( cont & MASK_WATER ) {
+				waterlevel = 2;
+				point[2] = ent->r.currentOrigin[2] + MINS_Z + sample2;
+				cont = trap_PointContents (point, passent );
+				if ( cont & MASK_WATER ){
+					waterlevel = 3;
+				}
+			}
+		}
+
+		// check for drowning
+		if ( waterlevel == 3 ) {
+			// if out of air, start drowning
+			if ( player->client->airOutTime < level.time) {
+				// drown!
+				player->client->airOutTime += 1000;
+				if ( player->health > 0 ) {
+					// take more damage the longer underwater
+					player->damage += 2;
+					if (player->damage > 15)
+						player->damage = 15;
+
+					// play a gurp sound instead of a normal pain sound
+					if (player->health <= player->damage) {
+						G_Sound(player, CHAN_VOICE, G_SoundIndex("*drown.wav"));
+					} else if (rand()&1) {
+						G_Sound(player, CHAN_VOICE, G_SoundIndex("sound/player/gurp1.wav"));
+					} else {
+						G_Sound(player, CHAN_VOICE, G_SoundIndex("sound/player/gurp2.wav"));
+					}
+
+					// don't play a normal pain sound
+					player->pain_debounce_time = level.time + 200;
+
+					G_Damage (ent, NULL, NULL, NULL, NULL, player->damage, DAMAGE_NO_ARMOR, MOD_WATER);
+				}
+			}
+		} else {
+			player->client->airOutTime = level.time + 12000;
+			player->damage = 2;
+		}
+
+		// check for sizzle damage
+		if ( waterlevel && ( watertype & ( CONTENTS_LAVA | CONTENTS_SLIME ) ) ) {
+			if ( watertype & CONTENTS_LAVA ) {
+				G_Damage( ent, NULL, NULL, NULL, NULL, 30 * waterlevel, 0, MOD_LAVA );
+			}
+
+			if ( watertype & CONTENTS_SLIME ) {
+				G_Damage( ent, NULL, NULL, NULL, NULL, 10 * waterlevel, 0, MOD_SLIME );
+			}
+		}
+	}
+}
+
+/*
+================
+G_BouncePlayerProxy
+================
+*/
+void G_BouncePlayerProxy( gentity_t *ent, trace_t *trace ) {
+	vec3_t	velocity;
+	float	dot;
+	int		hitTime;
+
+	// reflect the velocity on the trace plane
+	hitTime = level.previousTime + ( level.time - level.previousTime ) * trace->fraction;
+
+	BG_EvaluateTrajectoryDelta( &ent->s.pos, hitTime, velocity );
+
+	dot = DotProduct( velocity, trace->plane.normal );
+	VectorMA( velocity, -2*dot, trace->plane.normal, ent->s.pos.trDelta );
+
+	// cut the velocity to keep from bouncing forever
+	VectorScale( ent->s.pos.trDelta, ent->physicsBounce, ent->s.pos.trDelta );
+
+	// check for stop
+	if ( trace->plane.normal[2] > 0 && ent->s.pos.trDelta[2] < 40 ) {
+		trace->endpos[2] += 1.0;	// make sure it is off ground
+		SnapVector( trace->endpos );
+		G_SetOrigin( ent, trace->endpos );
+		ent->s.groundEntityNum = trace->entityNum;
+		return;
+	}
+
+	VectorAdd( ent->r.currentOrigin, trace->plane.normal, ent->r.currentOrigin);
+	VectorCopy( ent->r.currentOrigin, ent->s.pos.trBase );
+	ent->s.pos.trTime = level.time;
+}
+
+/*
+================
+G_RunPlayerProxy
+================
+*/
+void G_RunPlayerProxy( gentity_t *ent ) {
+	vec3_t		origin;
+	trace_t		tr;
+
+	// if groundentity has been set to -1, it may have been pushed off an edge
+	if ( ent->s.groundEntityNum == -1 ) {
+		if ( ent->s.pos.trType != TR_GRAVITY ) {
+			ent->s.pos.trType = TR_GRAVITY;
+			ent->s.pos.trTime = level.time;
+		}
+	}
+
+	if ( ent->s.pos.trType == TR_STATIONARY ) {
+		trap_LinkEntity( ent );
+		G_ProxyTouch( ent );
+		G_RunThink( ent );
+		return;
+	}
+
+	// get current position
+	BG_EvaluateTrajectory( &ent->s.pos, level.time, origin );
+
+	trap_Trace( &tr, ent->r.currentOrigin, ent->r.mins, ent->r.maxs, origin, 
+		ent->s.number, ent->clipmask );
+
+	VectorCopy( tr.endpos, ent->r.currentOrigin );
+
+	if ( tr.startsolid ) {
+		tr.fraction = 0;
+	}
+
+	if ( tr.fraction < 1.0f ) {
+		G_BouncePlayerProxy( ent, &tr );
+	}
+
+	trap_LinkEntity( ent );
+	G_ProxyTouch( ent );
+	G_RunThink( ent );
+}
 
 /*
 ==================
@@ -1095,11 +1321,14 @@ while a slow client may have multiple ClientEndFrame between ClientThink.
 */
 void ClientEndFrame( gentity_t *ent ) {
 	int			i;
+	clientPersistant_t	*pers;
 
 	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		SpectatorClientEndFrame( ent );
 		return;
 	}
+
+	pers = &ent->client->pers;
 
 	// turn off any expired powerups
 	for ( i = 0 ; i < MAX_POWERUPS ; i++ ) {
@@ -1151,9 +1380,9 @@ void ClientEndFrame( gentity_t *ent ) {
 
 	// add the EF_CONNECTION flag if we haven't gotten commands recently
 	if ( level.time - ent->client->lastCmdTime > 1000 ) {
-		ent->client->ps.eFlags |= EF_CONNECTION;
+		ent->s.eFlags |= EF_CONNECTION;
 	} else {
-		ent->client->ps.eFlags &= ~EF_CONNECTION;
+		ent->s.eFlags &= ~EF_CONNECTION;
 	}
 
 	ent->client->ps.stats[STAT_HEALTH] = ent->health;	// FIXME: get rid of ent->health...

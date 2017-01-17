@@ -1,24 +1,4 @@
-/*
-===========================================================================
-Copyright (C) 1999-2005 Id Software, Inc.
-
-This file is part of Quake III Arena source code.
-
-Quake III Arena source code is free software; you can redistribute it
-and/or modify it under the terms of the GNU General Public License as
-published by the Free Software Foundation; either version 2 of the License,
-or (at your option) any later version.
-
-Quake III Arena source code is distributed in the hope that it will be
-useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with Quake III Arena source code; if not, write to the Free Software
-Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-===========================================================================
-*/
+// Copyright (C) 1999-2000 Id Software, Inc.
 //
 // cg_view.c -- setup all the parameters (position, angle, etc)
 // for a 3D rendering
@@ -149,7 +129,7 @@ static void CG_AddTestModel (void) {
 		return;
 	}
 
-	// if testing a gun, set the origin relative to the view origin
+	// if testing a gun, set the origin reletive to the view origin
 	if ( cg.testGun ) {
 		VectorCopy( cg.refdef.vieworg, cg.testModelEntity.origin );
 		VectorCopy( cg.refdef.viewaxis[0], cg.testModelEntity.axis[0] );
@@ -210,7 +190,7 @@ static void CG_CalcVrect (void) {
 
 //==============================================================================
 
-
+/****************************WALLWALKING JG**********************************/
 /*
 ===============
 CG_OffsetThirdPersonView
@@ -219,7 +199,9 @@ CG_OffsetThirdPersonView
 */
 #define	FOCUS_DISTANCE	512
 static void CG_OffsetThirdPersonView( void ) {
-	vec3_t		forward, right, up;
+/***********************************************/
+	//ORIGINAL CODE BELOW-JG:
+	/*vec3_t		forward, right, up;
 	vec3_t		view;
 	vec3_t		focusAngles;
 	trace_t		trace;
@@ -269,7 +251,7 @@ static void CG_OffsetThirdPersonView( void ) {
 			VectorCopy( trace.endpos, view );
 			view[2] += (1.0 - trace.fraction) * 32;
 			// try another trace to this position, because a tunnel may have the ceiling
-			// close enough that this is poking out
+			// close enogh that this is poking out
 
 			CG_Trace( &trace, cg.refdef.vieworg, mins, maxs, view, cg.predictedPlayerState.clientNum, MASK_SOLID );
 			VectorCopy( trace.endpos, view );
@@ -297,11 +279,202 @@ static void CG_StepOffset( void ) {
 	// smooth out stair climbing
 	timeDelta = cg.time - cg.stepTime;
 	if ( timeDelta < STEP_TIME ) {
-		cg.refdef.vieworg[2] -= cg.stepChange 
-			* (STEP_TIME - timeDelta) / STEP_TIME;
+		cg.refdef.vieworg[2] -= cg.stepChange * (STEP_TIME - timeDelta) / STEP_TIME;
+	}*/
+	//END ORIGINAL CODE
+/*******************************************************************************/
+	vec3_t		forward, right, up;
+	vec3_t		view;
+	vec3_t		focusAngles;
+	trace_t		trace;
+	static vec3_t	mins = { -4, -4, -4 };
+	static vec3_t	maxs = { 4, 4, 4 };
+	vec3_t		focusPoint;
+	float		focusDist;
+	float		forwardScale, sideScale;
+	float Range, Pitch;
+	vec3_t Gravity;
+	int i;
+
+	Inv_GetVectorFromStat(cg.predictedPlayerState.stats[STAT_GRAVITY], Gravity);
+
+	if (!(cg.snap->ps.pm_flags & PMF_FOLLOW))// || cgs.Inv_FollowMode == 1)
+	{
+		for (i = 0; i < 3; ++i)
+			cg.refdef.vieworg[i] -= Gravity[i] * cg.predictedPlayerState.viewheight;
+
+		VectorCopy(cg.refdefViewAngles, focusAngles);
+
+		// if dead, look at killer
+		if (cg.predictedPlayerState.stats[STAT_HEALTH] <= 0)
+		{
+			focusAngles[YAW] = cg.predictedPlayerState.stats[STAT_DEAD_YAW];
+			cg.refdefViewAngles[YAW] = cg.predictedPlayerState.stats[STAT_DEAD_YAW];
+		}
+
+		if (focusAngles[PITCH] > 45)
+		{
+			focusAngles[PITCH] = 45;		// don't go too far overhead
+		}
+		else if (focusAngles[PITCH] < -45)
+		{
+			focusAngles[PITCH] = -45;
+		}
+
+		VectorCopy(cg.refdef.vieworg, view);
+
+		for (i = 0; i < 3; ++i)
+			view[i] -= Gravity[i] * 8;
+
+		cg.refdefViewAngles[PITCH] *= 0.5;
+
+		i = (cg.predictedPlayerState.stats[STAT_SPEC1] << 16)
+			+ (cg.predictedPlayerState.stats[STAT_SPEC2] & 65535);
+
+		if (!i)
+		{
+			AngleVectors(focusAngles, forward, NULL, NULL);
+			VectorMA(cg.refdef.vieworg, FOCUS_DISTANCE, forward, focusPoint);
+
+			AngleVectors(cg.refdefViewAngles, forward, right, up);
+		}
+		else
+		{
+			vec3_t Matrix[3];
+			vec4_t Quat;
+
+			Inv_GetQuatFromStat(i, Quat, NULL);
+
+			AngleVectors(focusAngles, Matrix[0], Matrix[1], Matrix[2]);
+			Inv_QuatMultiply(Quat, Matrix);
+
+			VectorMA(cg.refdef.vieworg, FOCUS_DISTANCE, Matrix[0], focusPoint);
+
+			AngleVectors(cg.refdefViewAngles, Matrix[0], Matrix[1], Matrix[2]);
+
+			Inv_QuatMultiply(Quat, Matrix);
+
+			VectorCopy(Matrix[0], forward);
+			VectorCopy(Matrix[1], right);
+			VectorCopy(Matrix[2], up);
+		}
+
+		if (!(cg.snap->ps.pm_flags & PMF_FOLLOW))
+			Range = cg_thirdPersonRange.value;
+		else
+			Range = 80.0f;
+
+		forwardScale = cos(cg_thirdPersonAngle.value / 180 * M_PI);
+		sideScale = sin(cg_thirdPersonAngle.value / 180 * M_PI);
+		VectorMA(view, -Range * forwardScale, forward, view);
+		VectorMA(view, -Range * sideScale, right, view);
+
+		// trace a ray from the origin to the viewpoint to make sure the view isn't
+		// in a solid block.  Use an 8 by 8 block to prevent the view from near clipping anything
+
+		if (!cg_cameraMode.integer)
+		{
+			CG_Trace(&trace, cg.refdef.vieworg, mins, maxs, view, cg.predictedPlayerState.clientNum, MASK_SOLID);
+
+			if (trace.fraction != 1.0)
+			{
+				VectorCopy(trace.endpos, view);
+
+				for (i = 0; i < 3; ++i)
+					view[i] -= (1.0 - trace.fraction) * 32 * Gravity[i];
+				//view[2] += (1.0 - trace.fraction) * 32;
+
+				// try another trace to this position, because a tunnel may have the ceiling
+				// close enogh that this is poking out
+
+				CG_Trace(&trace, cg.refdef.vieworg, mins, maxs, view, cg.predictedPlayerState.clientNum, MASK_SOLID);
+				VectorCopy(trace.endpos, view);
+			}
+		}
+
+		VectorCopy(view, cg.refdef.vieworg);
+
+		// select pitch to look at focus point from vieword
+		VectorSubtract(focusPoint, cg.refdef.vieworg, focusPoint);
+
+		Range = DotProduct(Gravity, focusPoint);
+
+		for (i = 0; i < 3; ++i)
+			forward[i] = focusPoint[i] - Gravity[i] * Range;
+
+		for (i = 0; i < 3; ++i)
+			up[i] = Gravity[i] * Range;
+		if (Range > 0)
+			Range = -VectorLength(up);
+		else
+			Range = VectorLength(up);
+
+		focusDist = VectorLength(forward);
+		if (focusDist < 1)
+			focusDist = 1;	// should never happen
+
+		cg.refdefViewAngles[PITCH] = -180 / M_PI * atan2(Range, focusDist);
+		cg.refdefViewAngles[YAW] -= cg_thirdPersonAngle.value;
+	}
+	else
+	{
+		usercmd_t Cmd;
+
+		Range = 80.0f;
+		trap_GetUserCmd(trap_GetCurrentCmdNumber(), &Cmd);
+		cg.refdefViewAngles[YAW] = SHORT2ANGLE(Cmd.angles[YAW]);// + cg.snap->ps.viewangles[YAW];
+		Pitch = SHORT2ANGLE(Cmd.angles[PITCH]);//cg.snap->ps.viewangles[PITCH];
+		if (Pitch > 180)
+			Pitch -= 360;
+		Pitch *= 2;
+		if (Pitch < -90)
+			Pitch = -90;
+		else if (Pitch > 90)
+			Pitch = 90;
+
+		cg.refdefViewAngles[PITCH] = Pitch;
+
+		for (i = 0; i < 3; ++i)
+			cg.refdef.vieworg[i] -= cg.predictedPlayerState.viewheight * Gravity[i];
+
+		VectorCopy(cg.refdef.vieworg, view);
+
+		for (i = 0; i < 3; ++i)
+			view[i] -= Gravity[i] * 8;
+
+		AngleVectors(cg.refdefViewAngles, forward, NULL, NULL);
+
+		VectorMA(view, -Range, forward, view);
+
+		// trace a ray from the origin to the viewpoint to make sure the view isn't
+		// in a solid block.  Use an 8 by 8 block to prevent the view from near clipping anything
+		if (!cg_cameraMode.integer)
+		{
+			CG_Trace(&trace, cg.refdef.vieworg, mins, maxs, view, cg.predictedPlayerState.clientNum, MASK_SOLID);
+
+			if (trace.fraction != 1.0)
+				VectorCopy(trace.endpos, view);
+		}
+
+		VectorCopy(view, cg.refdef.vieworg);
 	}
 }
+/****************************END WALLWALKING JG**********************************/
 
+// this causes a compiler bug on mac MrC compiler
+static void CG_StepOffset(void)
+{
+	int timeDelta, i;
+
+	// smooth out stair climbing
+	timeDelta = cg.time - cg.stepTime;
+	if (timeDelta < STEP_TIME)
+	{
+		for (i = 0; i < 3; ++i)
+			cg.refdef.vieworg[i] -= cg.stepChange[i] * (STEP_TIME - timeDelta) / STEP_TIME;
+	}
+}
+/****************************WALLWALKING JG**********************************/
 /*
 ===============
 CG_OffsetFirstPersonView
@@ -309,7 +482,9 @@ CG_OffsetFirstPersonView
 ===============
 */
 static void CG_OffsetFirstPersonView( void ) {
-	float			*origin;
+/**********************************************************/
+	//ORIGINAL CODE BELOW-JG:
+	/*float			*origin;
 	float			*angles;
 	float			bob;
 	float			ratio;
@@ -334,6 +509,9 @@ static void CG_OffsetFirstPersonView( void ) {
 		origin[2] += cg.predictedPlayerState.viewheight;
 		return;
 	}
+
+	// add angles based on weapon kick
+	VectorAdd (angles, cg.kick_angles, angles);
 
 	// add angles based on damage kick
 	if ( cg.damageTime ) {
@@ -419,6 +597,10 @@ static void CG_OffsetFirstPersonView( void ) {
 	// add step offset
 	CG_StepOffset();
 
+	// add kick offset
+
+	VectorAdd (origin, cg.kick_origin, origin);
+
 	// pivot the eye based on a neck length
 #if 0
 	{
@@ -430,12 +612,164 @@ static void CG_OffsetFirstPersonView( void ) {
 	VectorMA( cg.refdef.vieworg, 3, forward, cg.refdef.vieworg );
 	VectorMA( cg.refdef.vieworg, NECK_LENGTH, up, cg.refdef.vieworg );
 	}
+#endif*/
+/******************************************************************/
+
+	float			*origin;
+	float			*angles;
+	float			bob;
+	float			ratio;
+	float			delta;
+	float			speed;
+	float			f;
+	vec3_t			predictedVelocity;
+	int			timeDelta, i;
+	vec3_t Gravity;
+
+	if (cg.snap->ps.pm_type == PM_INTERMISSION)
+	{
+		return;
+	}
+
+	origin = cg.refdef.vieworg;
+	angles = cg.refdefViewAngles;
+
+	// if dead, fix the angle and don't add any kick
+	if (cg.snap->ps.stats[STAT_HEALTH] <= 0)
+	{
+		angles[ROLL] = 40;
+		angles[PITCH] = -15;
+		angles[YAW] = cg.snap->ps.stats[STAT_DEAD_YAW];
+		origin[2] += cg.predictedPlayerState.viewheight;
+		return;
+	}
+
+	// add angles based on weapon kick
+	VectorAdd (angles, cg.kick_angles, angles);
+
+	// add angles based on damage kick
+	if (cg.damageTime)
+	{
+		ratio = cg.time - cg.damageTime;
+		if (ratio < DAMAGE_DEFLECT_TIME)
+		{
+			ratio /= DAMAGE_DEFLECT_TIME;
+			angles[PITCH] += ratio * cg.v_dmg_pitch;
+			angles[ROLL] += ratio * cg.v_dmg_roll;
+		}
+		else
+		{
+			ratio = 1.0 - (ratio - DAMAGE_DEFLECT_TIME) / DAMAGE_RETURN_TIME;
+			if (ratio > 0)
+			{
+				angles[PITCH] += ratio * cg.v_dmg_pitch;
+				angles[ROLL] += ratio * cg.v_dmg_roll;
+			}
+		}
+	}
+
+	// add pitch based on fall kick
+#if 0
+	ratio = (cg.time - cg.landTime) / FALL_TIME;
+	if (ratio < 0)
+		ratio = 0;
+	angles[PITCH] += ratio * cg.fall_value;
 #endif
+
+	// add angles based on velocity
+	VectorCopy(cg.predictedPlayerState.velocity, predictedVelocity);
+
+	delta = DotProduct (predictedVelocity, cg.refdef.viewaxis[0]);
+	angles[PITCH] += delta * cg_runpitch.value;
+
+	delta = DotProduct (predictedVelocity, cg.refdef.viewaxis[1]);
+	angles[ROLL] -= delta * cg_runroll.value;
+
+	// add angles based on bob
+
+	// make sure the bob is visible even at low speeds
+	speed = cg.xyspeed > 200 ? cg.xyspeed : 200;
+
+	delta = cg.bobfracsin * cg_bobpitch.value * speed;
+	if (cg.predictedPlayerState.pm_flags & PMF_DUCKED)
+		delta *= 3;		// crouching
+	angles[PITCH] += delta;
+	delta = cg.bobfracsin * cg_bobroll.value * speed;
+	if (cg.predictedPlayerState.pm_flags & PMF_DUCKED)
+		delta *= 3;		// crouching accentuates roll
+	if (cg.bobcycle & 1)
+		delta = -delta;
+	angles[ROLL] += delta;
+
+//===================================
+
+	// add view height
+	Inv_GetVectorFromStat(cg.predictedPlayerState.stats[STAT_GRAVITY], Gravity);
+
+	for (i = 0; i < 3; ++i)
+		cg.refdef.vieworg[i] -= cg.predictedPlayerState.viewheight * Gravity[i];
+
+	// smooth out duck height changes
+	timeDelta = cg.time - cg.duckTime;
+	if (timeDelta < DUCK_TIME)
+	{
+		for (i = 0; i < 3; ++i)
+			cg.refdef.vieworg[i] += Gravity[i] * cg.duckChange
+									* (DUCK_TIME - timeDelta) / DUCK_TIME;
+	}
+
+	// add bob height
+	bob = cg.bobfracsin * cg.xyspeed * cg_bobup.value;
+	if (bob > 6)
+	{
+		bob = 6;
+	}
+
+	for (i = 0; i < 3; ++i)
+		origin[i] += bob * Gravity[i];
+
+
+	// add fall height
+	delta = cg.time - cg.landTime;
+	if (delta < LAND_DEFLECT_TIME)
+	{
+		f = delta / LAND_DEFLECT_TIME;
+		cg.refdef.vieworg[2] += cg.landChange * f;
+	}
+	else if (delta < LAND_DEFLECT_TIME + LAND_RETURN_TIME)
+	{
+		delta -= LAND_DEFLECT_TIME;
+		f = 1.0 - (delta / LAND_RETURN_TIME);
+		cg.refdef.vieworg[2] += cg.landChange * f;
+	}
+
+	// add step offset
+	CG_StepOffset();
+
+	// add kick offset
+
+	VectorAdd (origin, cg.kick_origin, origin);
+
+	// pivot the eye based on a neck length
+#if 0
+	{
+#define	NECK_LENGTH		8
+	vec3_t			forward, up;
+
+	cg.refdef.vieworg[2] -= NECK_LENGTH;
+	AngleVectors(cg.refdefViewAngles, forward, NULL, up);
+	VectorMA(cg.refdef.vieworg, 3, forward, cg.refdef.vieworg);
+	VectorMA(cg.refdef.vieworg, NECK_LENGTH, up, cg.refdef.vieworg);
+	}
+#endif
+/****************************END WALLWALKING JG**********************************/
 }
 
 //======================================================================
 
-void CG_ZoomDown_f( void ) { 
+void CG_ZoomDown_f( void ) 
+{ 
+	
 	if ( cg.zoomed ) {
 		return;
 	}
@@ -443,7 +777,8 @@ void CG_ZoomDown_f( void ) {
 	cg.zoomTime = cg.time;
 }
 
-void CG_ZoomUp_f( void ) { 
+void CG_ZoomUp_f( void ) 
+{
 	if ( !cg.zoomed ) {
 		return;
 	}
@@ -463,6 +798,8 @@ Fixed fov at intermissions, otherwise account for fov variable and zooms.
 #define	WAVE_FREQUENCY	0.4
 
 static int CG_CalcFov( void ) {
+	
+	clientInfo_t	*ci=cgs.clientinfo;
 	float	x;
 	float	phase;
 	float	v;
@@ -471,22 +808,45 @@ static int CG_CalcFov( void ) {
 	float	zoomFov;
 	float	f;
 	int		inwater;
+//	int		slimeStart;
+//	int		betweenTime;
+	int		xvalue;
+	int		yvalue;
 
-	if ( cg.predictedPlayerState.pm_type == PM_INTERMISSION ) {
-		// if in intermission, use a fixed value
-		fov_x = 90;
-	} else {
-		// user selectable
-		if ( cgs.dmflags & DF_FIXED_FOV ) {
-			// dmflag to prevent wide fov for all clients
+
+	if ( cg.predictedPlayerState.pm_type == PM_INTERMISSION ) 
+	{		
 			fov_x = 90;
-		} else {
-			fov_x = cg_fov.value;
-			if ( fov_x < 1 ) {
+	} 
+	else 		
+	{
+		// user selectable
+		if ( cgs.dmflags & DF_FIXED_FOV ) 
+		{
+	//	if (cg.snap->ps.persistant[PERS_TEAM] == TEAM_BLUE) //aliens
+	//		fov_x = 120;
+	//	else if(cg.snap->ps.persistant[PERS_TEAM] == TEAM_RED)//marines
+	//		fov_x = 90;
+	//	else // spectators etc
+			fov_x = 90;
+		} 
+		
+		else 
+		{
+			
+		//	if (cg.snap->ps.persistant[PERS_TEAM] == TEAM_BLUE) //aliens
+	//		fov_x = 120;
+	//	else if(cg.snap->ps.persistant[PERS_TEAM] == TEAM_RED)//marines
+	//		fov_x = 90;
+	//	else // spectators etc
+			fov_x = 90;
+
+		//Make sure fov is not negative or over 160
+			if( fov_x < 1 ) 
 				fov_x = 1;
-			} else if ( fov_x > 160 ) {
-				fov_x = 160;
-			}
+				else 
+					if( fov_x > 160 )
+						fov_x = 160;
 		}
 
 		// account for zooms
@@ -506,34 +866,56 @@ static int CG_CalcFov( void ) {
 			}
 		} else {
 			f = ( cg.time - cg.zoomTime ) / (float)ZOOM_TIME;
-			if ( f <= 1.0 ) {
+			if ( f > 1.0 ) {
+				fov_x = fov_x;
+			} else {
 				fov_x = zoomFov + f * ( fov_x - zoomFov );
 			}
 		}
+	
 	}
 
 	x = cg.refdef.width / tan( fov_x / 360 * M_PI );
 	fov_y = atan2( cg.refdef.height, x );
 	fov_y = fov_y * 360 / M_PI;
 
+
+
+	//*********************************SLIME**********************************
+	xvalue = fov_x;//store origional values ... probably wont need... oh well
+	yvalue = fov_y;
+
+	
+/*	if(cg.snap->ps.stats[STAT_SLIMED]==qtrue)
+	{	//if they are slimed
+		phase = cg.time / 500.0 * WAVE_FREQUENCY * M_PI * 2;
+		fov_x += WAVE_AMPLITUDE * sin( phase ) * 80;
+		fov_y -= WAVE_AMPLITUDE * sin( phase ) * 50;
+		//inwater=qtrue;
+	}*/
+
+	//*********************************SLIME**********************************
+
+
 	// warp if underwater
 	contents = CG_PointContents( cg.refdef.vieworg, -1 );
-	if ( contents & ( CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA ) ){
-		phase = cg.time / 1000.0 * WAVE_FREQUENCY * M_PI * 2;
+	if ((contents & ( CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA ))){
+		phase = cg.time / 500.0 * WAVE_FREQUENCY * M_PI * 2;
 		v = WAVE_AMPLITUDE * sin( phase );
 		fov_x += v;
 		fov_y -= v;
-		inwater = qtrue;
+		inwater=qtrue;
 	}
-	else {
+	else
+	{
 		inwater = qfalse;
 	}
 
-
 	// set it
+
 	cg.refdef.fov_x = fov_x;
 	cg.refdef.fov_y = fov_y;
-
+	
 	if ( !cg.zoomed ) {
 		cg.zoomSensitivity = 1;
 	} else {
@@ -542,7 +924,6 @@ static int CG_CalcFov( void ) {
 
 	return inwater;
 }
-
 
 
 /*
@@ -555,10 +936,6 @@ static void CG_DamageBlendBlob( void ) {
 	int			t;
 	int			maxTime;
 	refEntity_t		ent;
-
-	if (!cg_blood.integer) {
-		return;
-	}
 
 	if ( !cg.damageValue ) {
 		return;
@@ -597,7 +974,7 @@ static void CG_DamageBlendBlob( void ) {
 	trap_R_AddRefEntityToScene( &ent );
 }
 
-
+/****************************WALLWALKING JG**********************************/
 /*
 ===============
 CG_CalcViewValues
@@ -606,7 +983,9 @@ Sets cg.refdef view values
 ===============
 */
 static int CG_CalcViewValues( void ) {
-	playerState_t	*ps;
+/***************************************************/
+	//-JG WallWalk ORIGINAL CODE BELOW
+	/*playerState_t	*ps;
 
 	memset( &cg.refdef, 0, sizeof( cg.refdef ) );
 
@@ -633,7 +1012,7 @@ static int CG_CalcViewValues( void ) {
 	}
 */
 	// intermission view
-	if ( ps->pm_type == PM_INTERMISSION ) {
+/*	if ( ps->pm_type == PM_INTERMISSION ) {
 		VectorCopy( ps->origin, cg.refdef.vieworg );
 		VectorCopy( ps->viewangles, cg.refdefViewAngles );
 		AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
@@ -677,7 +1056,7 @@ static int CG_CalcViewValues( void ) {
 		CG_OffsetFirstPersonView();
 	}
 
-	// position eye relative to origin
+	// position eye reletive to origin
 	AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
 
 	if ( cg.hyperspace ) {
@@ -685,9 +1064,124 @@ static int CG_CalcViewValues( void ) {
 	}
 
 	// field of view
+	return CG_CalcFov();*/
+	//END ORIGINAL CODE-JG
+/******************************************************************/
+	playerState_t	*ps;
+
+	memset(&cg.refdef, 0, sizeof(cg.refdef));
+
+	// strings for in game rendering
+	// Q_strncpyz(cg.refdef.text[0], "Park Ranger", sizeof(cg.refdef.text[0]));
+	// Q_strncpyz(cg.refdef.text[1], "19", sizeof(cg.refdef.text[1]));
+
+	// calculate size of 3D view
+	CG_CalcVrect();
+
+	ps = &cg.predictedPlayerState;
+/*
+	if (cg.cameraMode) {
+		vec3_t origin, angles;
+		if (trap_getCameraInfo(cg.time, &origin, &angles)) {
+			VectorCopy(origin, cg.refdef.vieworg);
+			angles[ROLL] = 0;
+			VectorCopy(angles, cg.refdefViewAngles);
+			AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+			return CG_CalcFov();
+		} else {
+			cg.cameraMode = qfalse;
+		}
+	}
+*/
+
+	// intermission view
+	if (ps->pm_type == PM_INTERMISSION)
+	{
+		VectorCopy(ps->origin, cg.refdef.vieworg);
+		VectorCopy(ps->viewangles, cg.refdefViewAngles);
+		AnglesToAxis(cg.refdefViewAngles, cg.refdef.viewaxis);
+		return CG_CalcFov();
+	}
+
+	cg.bobcycle = (ps->bobCycle & 128) >> 7;
+	cg.bobfracsin = fabs(sin((ps->bobCycle & 127) / 127.0 * M_PI));
+	cg.xyspeed = sqrt(ps->velocity[0] * ps->velocity[0] +
+		ps->velocity[1] * ps->velocity[1]);
+
+
+	VectorCopy(ps->origin, cg.refdef.vieworg);
+	VectorCopy(ps->viewangles, cg.refdefViewAngles);
+
+	if (cg_cameraOrbit.integer)
+	{
+		if (cg.time > cg.nextOrbitTime)
+		{
+			cg.nextOrbitTime = cg.time + cg_cameraOrbitDelay.integer;
+			cg_thirdPersonAngle.value += cg_cameraOrbit.value;
+		}
+	}
+	// add error decay
+	if (cg_errorDecay.value > 0)
+	{
+		int		t;
+		float	f;
+
+		t = cg.time - cg.predictedErrorTime;
+		f = (cg_errorDecay.value - t) / cg_errorDecay.value;
+		if (f > 0 && f < 1)
+		{
+			VectorMA(cg.refdef.vieworg, f, cg.predictedError, cg.refdef.vieworg);
+		}
+		else
+		{
+			cg.predictedErrorTime = 0;
+		}
+	}
+
+	if (cg.renderingThirdPerson)
+	{
+		// back away from character
+		CG_OffsetThirdPersonView();
+	}
+	else
+	{
+		// offset for local bobbing and kicks
+		CG_OffsetFirstPersonView();
+	}
+
+	// position eye reletive to origin
+	AnglesToAxis(cg.refdefViewAngles, cg.refdef.viewaxis);
+
+	if (!cg.renderingThirdPerson)
+	{
+		vec4_t Quat;
+		int Current = (cg.predictedPlayerState.stats[STAT_SPEC1] << 16)
+						+ (cg.predictedPlayerState.stats[STAT_SPEC2] & 65535);
+
+		if (Current)
+		{
+			Inv_GetQuatFromStat(Current, Quat, NULL);
+			Inv_QuatMultiply(Quat, cg.refdef.viewaxis);
+		}
+	}
+	else if (!(cg.snap->ps.pm_flags & PMF_FOLLOW))// || cgs.Inv_FollowMode == 1)//NO USAGE IN AVM-JG
+	{
+		vec4_t Quat;
+
+		Inv_GetVectorFromStat(cg.predictedPlayerState.stats[STAT_GRAVITY], Gravity);
+		Inv_ApplyGravityRotation(-3, Quat);
+		Inv_QuatMultiply(Quat, cg.refdef.viewaxis);
+	}
+
+	if (cg.hyperspace)
+	{
+		cg.refdef.rdflags |= RDF_NOWORLDMODEL | RDF_HYPERSPACE;
+	}
+
+	// field of view
 	return CG_CalcFov();
 }
-
+/****************************END WALLWALKING JG**********************************/
 
 /*
 =====================
@@ -818,10 +1312,8 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	// add buffered sounds
 	CG_PlayBufferedSounds();
 
-#ifdef MISSIONPACK
 	// play buffered voice chats
 	CG_PlayBufferedVoiceChats();
-#endif
 
 	// finish up the rest of the refdef
 	if ( cg.testModelEntity.hModel ) {

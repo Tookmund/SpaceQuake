@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Quake III Arena source code; if not, write to the Free Software
+along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
@@ -46,7 +46,6 @@ void G_BounceMissile( gentity_t *ent, trace_t *trace ) {
 		// check for stop
 		if ( trace->plane.normal[2] > 0.2 && VectorLength( ent->s.pos.trDelta ) < 40 ) {
 			G_SetOrigin( ent, trace->endpos );
-			ent->s.time = level.time / 4;
 			return;
 		}
 	}
@@ -69,12 +68,18 @@ void G_ExplodeMissile( gentity_t *ent ) {
 	vec3_t		origin;
 
 	BG_EvaluateTrajectory( &ent->s.pos, level.time, origin );
+
 	SnapVector( origin );
 	G_SetOrigin( ent, origin );
 
 	// we don't have a valid direction, so just point straight up
 	dir[0] = dir[1] = 0;
 	dir[2] = 1;
+
+	
+	ent->s.generic1 = 0;
+
+
 
 	ent->s.eType = ET_GENERAL;
 	G_AddEvent( ent, EV_MISSILE_MISS, DirToByte( dir ) );
@@ -84,13 +89,14 @@ void G_ExplodeMissile( gentity_t *ent ) {
 	// splash damage
 	if ( ent->splashDamage ) {
 		if( G_RadiusDamage( ent->r.currentOrigin, ent->parent, ent->splashDamage, ent->splashRadius, ent
-			, ent->splashMethodOfDeath ) ) {
+			, ent->splashMethodOfDeath) ) {
 			g_entities[ent->r.ownerNum].client->accuracy_hits++;
 		}
 	}
 
 	trap_LinkEntity( ent );
 }
+
 
 
 #ifdef MISSIONPACK
@@ -284,6 +290,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 		return;
 	}
 
+
 #ifdef MISSIONPACK
 	if ( other->takedamage ) {
 		if ( ent->s.weapon != WP_PROX_LAUNCHER ) {
@@ -315,6 +322,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 				hitClient = qtrue;
 			}
 			BG_EvaluateTrajectoryDelta( &ent->s.pos, level.time, velocity );
+
 			if ( VectorLength( velocity ) == 0 ) {
 				velocity[2] = 1;	// stepped on a grenade
 			}
@@ -326,7 +334,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 
 #ifdef MISSIONPACK
 	if( ent->s.weapon == WP_PROX_LAUNCHER ) {
-		if( ent->s.pos.trType != TR_GRAVITY ) {
+		if( ent->s.pos.trType != TR_GRAVITY && ent->s.pos.trType != TR_SMALL_GRAVITY ) {
 			return;
 		}
 
@@ -430,7 +438,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 	// splash damage (doesn't apply to person directly hit)
 	if ( ent->splashDamage ) {
 		if( G_RadiusDamage( trace->endpos, ent->parent, ent->splashDamage, ent->splashRadius, 
-			other, ent->splashMethodOfDeath ) ) {
+			other, ent->splashMethodOfDeath) ) {
 			if( !hitClient ) {
 				g_entities[ent->r.ownerNum].client->accuracy_hits++;
 			}
@@ -440,14 +448,17 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 	trap_LinkEntity( ent );
 }
 
+
 /*
 ================
 G_RunMissile
 ================
 */
+/******************** Sandro Launchpad/Teleport stuff big changes 3/10/08 *********************/
 void G_RunMissile( gentity_t *ent ) {
 	vec3_t		origin;
 	trace_t		tr;
+	gentity_t	*traceEnt = NULL; //Sandro
 	int			passent;
 
 	// get current position
@@ -468,11 +479,34 @@ void G_RunMissile( gentity_t *ent ) {
 		passent = ent->r.ownerNum;
 	}
 	// trace a line from the previous position to the current position
-	trap_Trace( &tr, ent->r.currentOrigin, ent->r.mins, ent->r.maxs, origin, passent, ent->clipmask );
+	//Sandro - check to see if the missile is ignoring the min/max
+	if ( ent->ignoresize )
+		trap_Trace( &tr, ent->r.currentOrigin, NULL, NULL, origin, passent, ent->clipmask | CONTENTS_TRIGGER);
+	else
+		trap_Trace( &tr, ent->r.currentOrigin, ent->r.mins, ent->r.maxs, origin, passent, ent->clipmask | CONTENTS_TRIGGER);
+
+	if ( tr.entityNum != ENTITYNUM_NONE )
+	{
+		//Sandro - see if it's a teleport trigger and teleport the missile if it is
+		traceEnt = &g_entities[ tr.entityNum ];
+		if ( traceEnt && traceEnt->s.eType == ET_TELEPORT_TRIGGER ) {
+			trigger_teleporter_touch ( traceEnt, ent, &tr );
+			return;
+		}
+	}
+
+	//Sandro - ignore the min/max?
+	if ( ent->ignoresize )
+		trap_Trace( &tr, ent->r.currentOrigin, NULL, NULL, origin, passent, ent->clipmask );
+	else
+		trap_Trace( &tr, ent->r.currentOrigin, ent->r.mins, ent->r.maxs, origin, passent, ent->clipmask );
 
 	if ( tr.startsolid || tr.allsolid ) {
 		// make sure the tr.entityNum is set to the entity we're stuck in
-		trap_Trace( &tr, ent->r.currentOrigin, ent->r.mins, ent->r.maxs, ent->r.currentOrigin, passent, ent->clipmask );
+		if ( ent->ignoresize )
+			trap_Trace( &tr, ent->r.currentOrigin, NULL, NULL, ent->r.currentOrigin, passent, ent->clipmask );
+		else
+			trap_Trace( &tr, ent->r.currentOrigin, ent->r.mins, ent->r.maxs, ent->r.currentOrigin, passent, ent->clipmask );
 		tr.fraction = 0;
 	}
 	else {
@@ -506,10 +540,11 @@ void G_RunMissile( gentity_t *ent ) {
 		}
 	}
 #endif
+
 	// check think function after bouncing
 	G_RunThink( ent );
 }
-
+/******************** Sandro Launchpad/Teleport stuff big changes 3/10/08 *********************/
 
 //=============================================================================
 
@@ -667,7 +702,10 @@ gentity_t *fire_rocket (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->s.pos.trType = TR_LINEAR;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
+	//VectorScale( dir, 900, bolt->s.pos.trDelta );
+//******************************************************************
 	VectorScale( dir, 900, bolt->s.pos.trDelta );
+//******************************************************************
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 	VectorCopy (start, bolt->r.currentOrigin);
 
