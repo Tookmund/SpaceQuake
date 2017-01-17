@@ -164,7 +164,7 @@ qboolean	PM_SlideMove( qboolean gravity ) {
          //* SPAAACE!
          // Change Floor
          // This will definitely break
-         VectorCopy(pml.groundTrace.plane.normal, planes[i]);
+         VectorCopy(planes[i], pml.groundTrace.plane.normal);
          pml.groundPlane = qtrue;
          //*/
 			// see if there is a second plane that the new move enters
